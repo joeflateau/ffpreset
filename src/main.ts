@@ -7,16 +7,17 @@ import { spawn } from "child_process";
 import { parse } from "path";
 
 program
-  .arguments("<presetSpec> <inputFilePath>")
-  .action(async (presetSpec: string, inputFilePath: string) => {
+  .arguments("<presetRef> <inputFilePath>")
+  .action(async (presetRef: string, inputFilePath: string) => {
     await ensureBinaries();
 
-    // presetSpec = will be [github username]/[repo]/[filename] but that must map to https://raw.githubusercontent.com/[github username]/[repo]/master/[filename]
-    const { username, repo, filename } = parsePresetSpec(presetSpec);
-    const specUrl = specToUrl(username, repo, filename);
+    // presetRef = will be [github username]/[repo]/[filename] but that must map to https://raw.githubusercontent.com/[github username]/[repo]/master/[filename]
+    const { username, repo, filename, branch } = parsePresetRef(presetRef);
+    const presetUrl = presetRefToUrl(username, repo, filename, branch);
 
-    const specContents: { args: string[] } = (await axios.default.get(specUrl))
-      .data;
+    const presetContents: { args: string[] } = (
+      await axios.default.get(presetUrl)
+    ).data;
 
     const parsedFilename = parse(inputFilePath);
 
@@ -28,7 +29,7 @@ program
       return keyB.length - keyA.length;
     });
 
-    const args = specContents.args.map(arg =>
+    const args = presetContents.args.map(arg =>
       replacements.reduce((argValue, [key, value]) => {
         return argValue.replace(`$${key}`, value);
       }, arg)
@@ -39,28 +40,37 @@ program
 
 program.parse(process.argv);
 
-function specToUrl(username: string, repo: string, filename: string) {
+function presetRefToUrl(
+  username: string,
+  repo: string,
+  filename: string,
+  branch: string
+) {
   if (!filename.includes(".")) {
     filename = filename + ".json";
   }
-  return `https://raw.githubusercontent.com/${username}/${repo}/master/${filename}`;
+  return `https://raw.githubusercontent.com/${username}/${repo}/${branch}/${filename}`;
 }
 
-function parsePresetSpec(
-  presetSpec: string
-): { username: string; repo: string; filename: string } {
-  const parts = presetSpec.split("/");
+function parsePresetRef(
+  presetRef: string
+): { username: string; repo: string; filename: string; branch: string } {
+  const parts = presetRef.split("/");
 
   if (parts.length === 2) {
     const [username, filename] = parts;
-    return { username, repo: "ffpresets", filename };
+    return { username, repo: "ffpresets", filename, branch: "master" };
   }
   if (parts.length === 3) {
     const [username, repo, filename] = parts;
-    return { username, repo, filename };
+    return { username, repo, filename, branch: "master" };
+  }
+  if (parts.length === 4) {
+    const [username, repo, filename, branch] = parts;
+    return { username, repo, filename, branch };
   }
 
-  throw new Error("Could not parse preset spec");
+  throw new Error("Could not parse preset ref");
 }
 
 function ensureBinaries() {

@@ -52,7 +52,7 @@ program
             case 1:
                 _b.sent();
                 _a = parsePresetSpec(presetSpec), username = _a.username, repo = _a.repo, filename = _a.filename;
-                specUrl = "https://raw.githubusercontent.com/" + username + "/" + repo + "/master/" + filename;
+                specUrl = specToUrl(username, repo, filename);
                 return [4 /*yield*/, axios["default"].get(specUrl)];
             case 2:
                 specContents = (_b.sent())
@@ -79,6 +79,12 @@ program
     });
 }); });
 program.parse(process.argv);
+function specToUrl(username, repo, filename) {
+    if (!filename.includes(".")) {
+        filename = filename + ".json";
+    }
+    return "https://raw.githubusercontent.com/" + username + "/" + repo + "/master/" + filename;
+}
 function parsePresetSpec(presetSpec) {
     var parts = presetSpec.split("/");
     if (parts.length === 2) {

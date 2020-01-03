@@ -6,11 +6,11 @@ This tool will install the ffmpeg binary using `ffbinaries`. You do not need to 
 
 ## Example usage:
 
-`npx ffpreset <specReference> <videoFile>`
+`npx ffpreset <presetRef> <videoFile>`
 
-**specReference** is a reference to a file in a git repo, it has three parts: username, repo, filename. For example: `joeflateau/ffpresets/my-preset.json`. That gets translated to `https://raw.githubusercontent.com/joeflateau/ffpresets/master/my-preset.json`. You can omit the repo name, in which case the default of `ffpresets` will be used. You can also omit the file extension in which case the default of `.json` will be used. For example: `joeflateau/ffpresets/simple-example.json` and `joeflateau/simple-example` are equivalent. 
+**presetRef** is a reference to a file in a git repo, it has three parts: username, repo, filename. For example: `joeflateau/ffpresets/my-preset.json`. That gets translated to `https://raw.githubusercontent.com/joeflateau/ffpresets/master/my-preset.json`. You can omit the repo name, in which case the default of `ffpresets` will be used. You can also omit the file extension in which case the default of `.json` will be used. For example: `joeflateau/ffpresets/simple-example.json` and `joeflateau/simple-example` are equivalent. 
 
-## An example of a spec:
+## An example of a preset:
 
 ```json
 {
@@ -28,7 +28,7 @@ This tool will install the ffmpeg binary using `ffbinaries`. You do not need to 
 }
 ```
 
-These args have replacements substituted and are passed to the ffmpeg binary. There are currently 3 replacements you can use in your spec: `$input`, which is the fill path to the video file; `$inputFilename` which is just the name of the video file without the directory or extension; and `$inputBasename` which is the filename with the extension but without the directory.
+These args have replacements substituted and are passed to the ffmpeg binary. There are currently 3 replacements you can use in your preset: `$input`, which is the fill path to the video file; `$inputFilename` which is just the name of the video file without the directory or extension; and `$inputBasename` which is the filename with the extension but without the directory.
 
 
 ## Full usage example:
