@@ -8,7 +8,7 @@ This tool will install the ffmpeg binary using `ffbinaries`. You do not need to 
 
 `npx ffpreset <specReference> <videoFile>`
 
-**specReference** is a reference to a file in a git repo, it has three parts: username, repo, filename. For example: `joeflateau/ffpresets/my-preset.json`. That gets translated to `https://raw.githubusercontent.com/joeflateau/ffpresets/master/my-preset.json`
+**specReference** is a reference to a file in a git repo, it has three parts: username, repo, filename. For example: `joeflateau/ffpresets/my-preset.json`. That gets translated to `https://raw.githubusercontent.com/joeflateau/ffpresets/master/my-preset.json`. You can omit the repo name, in which case the default of `ffpresets` will be used. For example: `joeflateau/ffpresets/simple-example.json` and `joeflateau/simple-example.json` are equivalent. 
 
 ## An example of a spec:
 

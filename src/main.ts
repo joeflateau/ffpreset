@@ -12,7 +12,7 @@ program
     await ensureBinaries();
 
     // presetSpec = will be [github username]/[repo]/[filename] but that must map to https://raw.githubusercontent.com/[github username]/[repo]/master/[filename]
-    const [username, repo, filename] = presetSpec.split("/");
+    const { username, repo, filename } = parsePresetSpec(presetSpec);
     const specUrl = `https://raw.githubusercontent.com/${username}/${repo}/master/${filename}`;
 
     const specContents: { args: string[] } = (await axios.default.get(specUrl))
@@ -38,6 +38,23 @@ program
   });
 
 program.parse(process.argv);
+
+function parsePresetSpec(
+  presetSpec: string
+): { username: string; repo: string; filename: string } {
+  const parts = presetSpec.split("/");
+
+  if (parts.length === 2) {
+    const [username, filename] = parts;
+    return { username, repo: "ffpresets", filename };
+  }
+  if (parts.length === 3) {
+    const [username, repo, filename] = parts;
+    return { username, repo, filename };
+  }
+
+  throw new Error("Could not parse preset spec");
+}
 
 function ensureBinaries() {
   return new Promise(resolve => {
