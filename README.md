@@ -1,4 +1,4 @@
-# ffpresets
+# ffpreset
 
 This tool allows you to create and distribute easy to use video encoding presets for ffmpeg.
 
