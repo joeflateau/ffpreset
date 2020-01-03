@@ -51,7 +51,7 @@ program
             case 0: return [4 /*yield*/, ensureBinaries()];
             case 1:
                 _b.sent();
-                _a = presetSpec.split("/"), username = _a[0], repo = _a[1], filename = _a[2];
+                _a = parsePresetSpec(presetSpec), username = _a.username, repo = _a.repo, filename = _a.filename;
                 specUrl = "https://raw.githubusercontent.com/" + username + "/" + repo + "/master/" + filename;
                 return [4 /*yield*/, axios["default"].get(specUrl)];
             case 2:
@@ -79,6 +79,18 @@ program
     });
 }); });
 program.parse(process.argv);
+function parsePresetSpec(presetSpec) {
+    var parts = presetSpec.split("/");
+    if (parts.length === 2) {
+        var username = parts[0], filename = parts[1];
+        return { username: username, repo: "ffpresets", filename: filename };
+    }
+    if (parts.length === 3) {
+        var username = parts[0], repo = parts[1], filename = parts[2];
+        return { username: username, repo: repo, filename: filename };
+    }
+    throw new Error("Could not parse preset spec");
+}
 function ensureBinaries() {
     return new Promise(function (resolve) {
         ffbinaries_1.downloadBinaries({ destination: "./.bin" }, function () { return resolve(); });

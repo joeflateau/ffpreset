@@ -13,7 +13,7 @@ program
 
     // presetSpec = will be [github username]/[repo]/[filename] but that must map to https://raw.githubusercontent.com/[github username]/[repo]/master/[filename]
     const { username, repo, filename } = parsePresetSpec(presetSpec);
-    const specUrl = `https://raw.githubusercontent.com/${username}/${repo}/master/${filename}`;
+    const specUrl = specToUrl(username, repo, filename);
 
     const specContents: { args: string[] } = (await axios.default.get(specUrl))
       .data;
@@ -38,6 +38,13 @@ program
   });
 
 program.parse(process.argv);
+
+function specToUrl(username: string, repo: string, filename: string) {
+  if (!filename.includes(".")) {
+    filename = filename + ".json";
+  }
+  return `https://raw.githubusercontent.com/${username}/${repo}/master/${filename}`;
+}
 
 function parsePresetSpec(
   presetSpec: string
