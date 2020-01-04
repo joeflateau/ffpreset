@@ -12,6 +12,7 @@ import { IPresetFile } from "./lib/IPresetFile";
 import { PresetRef } from "./lib/PresetRef";
 import { childProcessPromise } from "./lib/childProcessPromise";
 import { collect } from "./lib/collect";
+import { sleep } from "./lib/sleep";
 
 const debug = Debug("ffpreset");
 
@@ -35,8 +36,15 @@ program
     const args = getFfmpegArgs(presetContents, inputFilePath, extraVars);
 
     do {
-      const ffmpegProcess = spawn("./.bin/ffmpeg", args, { stdio: "inherit" });
-      await childProcessPromise(ffmpegProcess);
+      try {
+        const ffmpegProcess = spawn("./.bin/ffmpeg", args, {
+          stdio: "inherit"
+        });
+        await childProcessPromise(ffmpegProcess);
+      } catch (err) {
+        debug(err);
+        await sleep(2000);
+      }
     } while (respawn);
   });
 
