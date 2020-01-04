@@ -7,6 +7,7 @@ import { spawn } from "child_process";
 import { parse } from "path";
 import { parse as parseQs } from "qs";
 import { flatMap } from "lodash";
+import { IPresetFile } from "IPresetFile";
 
 function collect(value: string, previous: Record<string, string>) {
   const parsed = parseQs(value);
@@ -23,16 +24,14 @@ program
     const { username, repo, filename, branch } = parsePresetRef(presetRef);
     const presetUrl = presetRefToUrl(username, repo, filename, branch);
 
-    interface IPresetFile {
-      args: (string | string[])[];
-    }
-
     const presetContents: IPresetFile = (await axios.default.get(presetUrl))
       .data;
 
     const parsedFilename = parse(inputFilePath);
 
-    const extraVars: Record<string, string> = program.vars;
+    const extraVars: Record<string, string> = program.var;
+
+    // print({ extraVars });
 
     const replacements = Object.entries({
       input: inputFilePath,
@@ -94,3 +93,7 @@ function ensureBinaries() {
     downloadBinaries({ destination: "./.bin" }, () => resolve());
   });
 }
+
+// function print(...value: any[]) {
+//   console.error(value.map(v => JSON.stringify(v)).join(" "));
+// }
