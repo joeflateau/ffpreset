@@ -5,9 +5,17 @@ import * as axios from "axios";
 import * as program from "commander";
 import { spawn } from "child_process";
 import { parse } from "path";
+import { parse as parseQs } from "qs";
+import { flatMap } from "lodash";
+
+function collect(value: string, previous: Record<string, string>) {
+  const parsed = parseQs(value);
+  return { ...previous, ...parsed };
+}
 
 program
   .arguments("<presetRef> <inputFilePath>")
+  .option("-V, --var <value>", "key value pairs to use in preset", collect, {})
   .action(async (presetRef: string, inputFilePath: string) => {
     await ensureBinaries();
 
@@ -15,21 +23,29 @@ program
     const { username, repo, filename, branch } = parsePresetRef(presetRef);
     const presetUrl = presetRefToUrl(username, repo, filename, branch);
 
-    const presetContents: { args: string[] } = (
-      await axios.default.get(presetUrl)
-    ).data;
+    interface IPresetFile {
+      args: (string | string[])[];
+    }
+
+    const presetContents: IPresetFile = (await axios.default.get(presetUrl))
+      .data;
 
     const parsedFilename = parse(inputFilePath);
+
+    const extraVars: Record<string, string> = program.vars;
 
     const replacements = Object.entries({
       input: inputFilePath,
       inputFilename: parsedFilename.name,
-      inputBasename: parsedFilename.base
+      inputBasename: parsedFilename.base,
+      ...extraVars
     }).sort(([keyA], [keyB]) => {
       return keyB.length - keyA.length;
     });
 
-    const args = presetContents.args.map(arg =>
+    const args = flatMap(presetContents.args, arg =>
+      typeof arg === "string" ? [arg] : arg
+    ).map(arg =>
       replacements.reduce((argValue, [key, value]) => {
         return argValue.replace(`$${key}`, value);
       }, arg)
