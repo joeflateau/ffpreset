@@ -16,6 +16,9 @@
   "bin": {
     "ffpreset": "./dist/main.js"
   },
+  "files": [
+    "dist"
+  ],
   "author": "Joe Flateau",
   "license": "ISC",
   "dependencies": {
