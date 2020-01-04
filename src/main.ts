@@ -5,71 +5,80 @@ import * as axios from "axios";
 import * as program from "commander";
 import { spawn } from "child_process";
 import { parse } from "path";
-import { parse as parseQs } from "qs";
 import { flatMap } from "lodash";
-import { IPresetFile } from "IPresetFile";
+import * as Debug from "debug";
 
-function collect(value: string, previous: Record<string, string>) {
-  const parsed = parseQs(value);
-  return { ...previous, ...parsed };
-}
+import { IPresetFile } from "./lib/IPresetFile";
+import { PresetRef } from "./lib/PresetRef";
+import { childProcessPromise } from "./lib/childProcessPromise";
+import { collect } from "./lib/collect";
+
+const debug = Debug("ffpreset");
 
 program
   .arguments("<presetRef> <inputFilePath>")
+  .option("-r, --respawn", "restart process if it exists")
   .option("-V, --var <value>", "key value pairs to use in preset", collect, {})
   .action(async (presetRef: string, inputFilePath: string) => {
+    const extraVars: Record<string, string> = program.var;
+    const respawn: boolean = program.respawn;
+
+    print({ extraVars, respawn });
+
     await ensureBinaries();
 
-    // presetRef = will be [github username]/[repo]/[filename] but that must map to https://raw.githubusercontent.com/[github username]/[repo]/master/[filename]
-    const { username, repo, filename, branch } = parsePresetRef(presetRef);
-    const presetUrl = presetRefToUrl(username, repo, filename, branch);
+    // presetRef = will be [github username]/[repo?]/[filename] but that must map to https://raw.githubusercontent.com/[github username]/[repo]/master/[filename]
+    const presetUrl = presetRefToUrl(presetRef);
 
-    const presetContents: IPresetFile = (await axios.default.get(presetUrl))
-      .data;
+    const presetContents = await downloadPresetFile(presetUrl);
 
-    const parsedFilename = parse(inputFilePath);
+    const args = getFfmpegArgs(presetContents, inputFilePath, extraVars);
 
-    const extraVars: Record<string, string> = program.var;
-
-    // print({ extraVars });
-
-    const replacements = Object.entries({
-      input: inputFilePath,
-      inputFilename: parsedFilename.name,
-      inputBasename: parsedFilename.base,
-      ...extraVars
-    }).sort(([keyA], [keyB]) => {
-      return keyB.length - keyA.length;
-    });
-
-    const args = flatMap(presetContents.args, arg =>
-      typeof arg === "string" ? [arg] : arg
-    ).map(arg =>
-      replacements.reduce((argValue, [key, value]) => {
-        return argValue.replace(`$${key}`, value);
-      }, arg)
-    );
-
-    spawn("./.bin/ffmpeg", args, { stdio: "inherit" });
+    do {
+      const ffmpegProcess = spawn("./.bin/ffmpeg", args, { stdio: "inherit" });
+      await childProcessPromise(ffmpegProcess);
+    } while (respawn);
   });
 
 program.parse(process.argv);
 
-function presetRefToUrl(
-  username: string,
-  repo: string,
-  filename: string,
-  branch: string
+function getFfmpegArgs(
+  presetContents: IPresetFile,
+  inputFilePath: string,
+  extraVars: Record<string, string>
 ) {
+  const parsedFilename = parse(inputFilePath);
+  const replacements = Object.entries({
+    input: inputFilePath,
+    inputFilename: parsedFilename.name,
+    inputBasename: parsedFilename.base,
+    ...extraVars
+  }).sort(([keyA], [keyB]) => {
+    return keyB.length - keyA.length;
+  });
+  const args = flatMap(presetContents.args, arg =>
+    typeof arg === "string" ? [arg] : arg
+  ).map(arg =>
+    replacements.reduce((argValue, [key, value]) => {
+      return argValue.replace(`$${key}`, value);
+    }, arg)
+  );
+  return args;
+}
+
+function presetRefToUrl(presetRef: string) {
+  let { username, repo, filename, branch } = parsePresetRef(presetRef);
   if (!filename.includes(".")) {
     filename = filename + ".json";
   }
   return `https://raw.githubusercontent.com/${username}/${repo}/${branch}/${filename}`;
 }
 
-function parsePresetRef(
-  presetRef: string
-): { username: string; repo: string; filename: string; branch: string } {
+async function downloadPresetFile(presetUrl: string): Promise<IPresetFile> {
+  return (await axios.default.get(presetUrl)).data;
+}
+
+function parsePresetRef(presetRef: string): PresetRef {
   const parts = presetRef.split("/");
 
   if (parts.length === 2) {
@@ -94,6 +103,6 @@ function ensureBinaries() {
   });
 }
 
-// function print(...value: any[]) {
-//   console.error(value.map(v => JSON.stringify(v)).join(" "));
-// }
+function print(...value: any[]) {
+  debug(value.map(v => JSON.stringify(v)).join(" "));
+}
