@@ -58,7 +58,7 @@ function getFfmpegArgs(
 ) {
   const parsedFilename = parse(inputFilePath);
 
-  const replacements = {
+  const replacements: Record<string, string> = {
     ...presetContents.vars,
     input: inputFilePath,
     inputFilename: parsedFilename.name,
@@ -66,9 +66,9 @@ function getFfmpegArgs(
     ...extraVars
   };
 
-  const args = flattenDeep(presetContents.args).map(arg => {
+  const args = flattenDeep(presetContents.args).map(arg =>
     arg.replace(
-      /\$([a-zA-Z_]+[a-zA-Z0-9_]*)|\$\{([a-zA-Z_]+[a-zA-Z0-9_]*)\}/,
+      /\$([a-zA-Z][a-zA-Z0-9_]*)|\$\{([a-zA-Z][a-zA-Z0-9_]*)\}/g,
       (_, m1, m2) => {
         const variable = m1 ?? m2;
         if (!(variable in replacements)) {
@@ -76,9 +76,8 @@ function getFfmpegArgs(
         }
         return replacements[variable];
       }
-    );
-    return arg;
-  });
+    )
+  );
   return args;
 }
 
