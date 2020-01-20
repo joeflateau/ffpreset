@@ -1,48 +1,49 @@
 #!/usr/bin/env node
 
 import { downloadBinaries } from "ffbinaries";
-import * as axios from "axios";
 import * as program from "commander";
 import { spawn } from "child_process";
 import { parse } from "path";
-import { flatMap } from "lodash";
+import { flattenDeep } from "lodash";
 import * as Debug from "debug";
 
 import { IPresetFile } from "./lib/IPresetFile";
-import { PresetRef } from "./lib/PresetRef";
 import { childProcessPromise } from "./lib/childProcessPromise";
 import { collect } from "./lib/collect";
 import { sleep } from "./lib/sleep";
+import { getPresetFromRef } from "lib/PresetRef";
 
 const debug = Debug("ffpreset");
 
 program
-  .arguments("<presetRef> <inputFilePath>")
+  .arguments("<presetRef> [inputFilePath...]")
   .option("-r, --respawn", "restart process if it exists")
   .option("-V, --var <value>", "key value pairs to use in preset", collect, {})
-  .action(async (presetRef: string, inputFilePath: string) => {
+  .action(async (presetRef: string, inputFilePaths: string[]) => {
     const extraVars: Record<string, string> = program.var;
     const respawn: boolean = program.respawn;
 
-    print({ extraVars, respawn });
+    print({ presetRef, inputFilePaths, extraVars, respawn });
 
     await ensureBinaries();
 
-    // presetRef = will be [github username]/[repo?]/[filename] but that must map to https://raw.githubusercontent.com/[github username]/[repo]/master/[filename]
-    const presetUrl = presetRefToUrl(presetRef);
-
-    const presetContents = await downloadPresetFile(presetUrl);
-
-    const args = getFfmpegArgs(presetContents, inputFilePath, extraVars);
+    const presetContents = await getPresetFromRef(presetRef);
 
     do {
-      try {
-        const ffmpegProcess = spawn("./.bin/ffmpeg", args, {
-          stdio: "inherit"
-        });
-        await childProcessPromise(ffmpegProcess);
-      } catch (err) {
-        debug(err);
+      for (let inputFilePath of inputFilePaths) {
+        const args = getFfmpegArgs(presetContents, inputFilePath, extraVars);
+
+        try {
+          const ffmpegProcess = spawn("./.bin/ffmpeg", args, {
+            stdio: "inherit"
+          });
+          await childProcessPromise(ffmpegProcess);
+        } catch (err) {
+          debug(err);
+        }
+      }
+
+      if (respawn) {
         await sleep(2000);
       }
     } while (respawn);
@@ -56,53 +57,29 @@ function getFfmpegArgs(
   extraVars: Record<string, string>
 ) {
   const parsedFilename = parse(inputFilePath);
-  const replacements = Object.entries({
+
+  const replacements = {
+    ...presetContents.vars,
     input: inputFilePath,
     inputFilename: parsedFilename.name,
     inputBasename: parsedFilename.base,
     ...extraVars
-  }).sort(([keyA], [keyB]) => {
-    return keyB.length - keyA.length;
+  };
+
+  const args = flattenDeep(presetContents.args).map(arg => {
+    arg.replace(
+      /\$([a-zA-Z_]+[a-zA-Z0-9_]*)|\$\{([a-zA-Z_]+[a-zA-Z0-9_]*)\}/,
+      (_, m1, m2) => {
+        const variable = m1 ?? m2;
+        if (!(variable in replacements)) {
+          throw new Error(`unbound variable ${variable}`);
+        }
+        return replacements[variable];
+      }
+    );
+    return arg;
   });
-  const args = flatMap(presetContents.args, arg =>
-    typeof arg === "string" ? [arg] : arg
-  ).map(arg =>
-    replacements.reduce((argValue, [key, value]) => {
-      return argValue.replace(`$${key}`, value);
-    }, arg)
-  );
   return args;
-}
-
-function presetRefToUrl(presetRef: string) {
-  let { username, repo, filename, branch } = parsePresetRef(presetRef);
-  if (!filename.includes(".")) {
-    filename = filename + ".json";
-  }
-  return `https://raw.githubusercontent.com/${username}/${repo}/${branch}/${filename}`;
-}
-
-async function downloadPresetFile(presetUrl: string): Promise<IPresetFile> {
-  return (await axios.default.get(presetUrl)).data;
-}
-
-function parsePresetRef(presetRef: string): PresetRef {
-  const parts = presetRef.split("/");
-
-  if (parts.length === 2) {
-    const [username, filename] = parts;
-    return { username, repo: "ffpresets", filename, branch: "master" };
-  }
-  if (parts.length === 3) {
-    const [username, repo, filename] = parts;
-    return { username, repo, filename, branch: "master" };
-  }
-  if (parts.length === 4) {
-    const [username, repo, filename, branch] = parts;
-    return { username, repo, filename, branch };
-  }
-
-  throw new Error("Could not parse preset ref");
 }
 
 function ensureBinaries() {

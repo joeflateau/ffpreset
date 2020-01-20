@@ -1,3 +1,6 @@
 export interface IPresetFile {
-  args: (string | string[])[];
+  vars?: Record<string, string>;
+  args: DeepArray<string>[];
 }
+
+type DeepArray<T> = T | DeepArray<T>[];
