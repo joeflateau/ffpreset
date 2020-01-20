@@ -11,7 +11,7 @@ import { IPresetFile } from "./lib/IPresetFile";
 import { childProcessPromise } from "./lib/childProcessPromise";
 import { collect } from "./lib/collect";
 import { sleep } from "./lib/sleep";
-import { getPresetFromRef } from "lib/PresetRef";
+import { getPresetFromRef } from "./lib/PresetRef";
 
 const debug = Debug("ffpreset");
 
