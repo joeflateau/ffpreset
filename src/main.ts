@@ -2,7 +2,7 @@
 
 import { downloadBinaries } from "ffbinaries";
 import * as program from "commander";
-import { spawn } from "child_process";
+import { spawn, ChildProcess } from "child_process";
 import { parse } from "path";
 import { flattenDeep } from "lodash";
 import * as Debug from "debug";
@@ -21,7 +21,7 @@ program
   .option("-V, --var <value>", "key value pairs to use in preset", collect, {})
   .action(async (presetRef: string, inputFilePaths: string[]) => {
     const extraVars: Record<string, string> = program.var;
-    const respawn: boolean = program.respawn;
+    let respawn: boolean = program.respawn;
 
     print({ presetRef, inputFilePaths, extraVars, respawn });
 
@@ -29,15 +29,28 @@ program
 
     const presetContents = await getPresetFromRef(presetRef);
 
+    let ffmpegProcess: ChildProcess;
+    let shuttingDown = false;
+
+    process.on("SIGINT", () => {
+      if (ffmpegProcess != null) {
+        ffmpegProcess.kill("SIGINT");
+      }
+      respawn = false;
+    });
+
     do {
       for (let inputFilePath of inputFilePaths) {
         const args = getFfmpegArgs(presetContents, inputFilePath, extraVars);
 
         try {
-          const ffmpegProcess = spawn("./.bin/ffmpeg", args, {
-            stdio: "inherit"
+          ffmpegProcess = spawn("./.bin/ffmpeg", args, {
+            stdio: ["ignore", "inherit", "inherit"]
           });
           await childProcessPromise(ffmpegProcess);
+          if (shuttingDown) {
+            break;
+          }
         } catch (err) {
           debug(err);
         }
