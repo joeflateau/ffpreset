@@ -18,14 +18,22 @@ const debug = Debug("ffpreset");
 program
   .arguments("<presetRef> [inputFilePath...]")
   .option("-r, --respawn", "restart process if it exists")
+  .option("-e, --existing", "use existing ffmpeg binaries on $PATH")
   .option("-V, --var <value>", "key value pairs to use in preset", collect, {})
   .action(async (presetRef: string, inputFilePaths: string[]) => {
     const extraVars: Record<string, string> = program.var;
     let respawn: boolean = program.respawn;
+    let useExisting: boolean = program.existing;
 
     print({ presetRef, inputFilePaths, extraVars, respawn });
 
-    await ensureBinaries();
+    const fflocation = await (async () => {
+      if (!useExisting) {
+        await ensureBinaries();
+        return "./.bin/ffmpeg";
+      }
+      return "ffmpeg";
+    })();
 
     const presetContents = await getPresetFromRef(presetRef);
 
@@ -44,8 +52,8 @@ program
         const args = getFfmpegArgs(presetContents, inputFilePath, extraVars);
 
         try {
-          ffmpegProcess = spawn("./.bin/ffmpeg", args, {
-            stdio: ["ignore", "inherit", "inherit"]
+          ffmpegProcess = spawn(fflocation, args, {
+            stdio: ["ignore", "inherit", "inherit"],
           });
           await childProcessPromise(ffmpegProcess);
           if (shuttingDown) {
@@ -76,30 +84,37 @@ function getFfmpegArgs(
     input: inputFilePath,
     inputFilename: parsedFilename.name,
     inputBasename: parsedFilename.base,
-    ...extraVars
+    ...extraVars,
   };
 
-  const args = flattenDeep(presetContents.args).map(arg =>
-    arg.replace(
-      /\$([a-zA-Z][a-zA-Z0-9_]*)|\$\{([a-zA-Z][a-zA-Z0-9_]*)\}/g,
-      (_, m1, m2) => {
-        const variable = m1 ?? m2;
-        if (!(variable in replacements)) {
-          throw new Error(`unbound variable ${variable}`);
-        }
-        return replacements[variable];
-      }
-    )
+  const args = flattenDeep(presetContents.args).map((arg) =>
+    replaceVariables(arg, replacements)
   );
   return args;
 }
 
+function replaceVariables(
+  arg: string,
+  replacements: Record<string, string>
+): string {
+  return arg.replace(
+    /\$([a-zA-Z][a-zA-Z0-9_]*)|\$\{([a-zA-Z][a-zA-Z0-9_]*)\}/g,
+    (_, m1, m2) => {
+      const variable = m1 ?? m2;
+      if (!(variable in replacements)) {
+        throw new Error(`unbound variable ${variable}`);
+      }
+      return replacements[variable];
+    }
+  );
+}
+
 function ensureBinaries() {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     downloadBinaries({ destination: "./.bin" }, () => resolve());
   });
 }
 
 function print(...value: any[]) {
-  debug(value.map(v => JSON.stringify(v)).join(" "));
+  debug(value.map((v) => JSON.stringify(v)).join(" "));
 }
